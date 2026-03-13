@@ -15,7 +15,7 @@ jobs:
       ARCH: amd64
       TAG: v2.4.2
       PKG: ${{ matrix.pkg }}
-    name: Build ${{ matrix.pkg }} for ${{ env.ARCH }}
+    name: Build ${{ matrix.pkg }} for amd64
     strategy: &strategy
       fail-fast: false
       matrix:
@@ -156,7 +156,7 @@ jobs:
       ARCH: arm64
       TAG: v2.4.2
       PKG: ${{ matrix.pkg }}
-    name: Build ${{ matrix.pkg }} for ${{ env.ARCH }}
+    name: Build ${{ matrix.pkg }} for arm64
     strategy: *strategy
     runs-on: ubuntu-24.04-arm
     steps: *build-steps
