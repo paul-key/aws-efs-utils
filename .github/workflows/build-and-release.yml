@@ -76,7 +76,7 @@ jobs:
             --platform="linux/$ARCH" \
             -v "$PWD":/src \
             -w /src \
-            -e "PKG=${PKG}"
+            -e "PKG=${PKG}" \
             "$BASE_IMAGE" \
             /bin/bash -c '
               set -e
