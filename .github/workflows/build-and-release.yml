@@ -33,7 +33,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
         with:
-          repository: git@github.com:aws/efs-utils.git
+          repository: aws/efs-utils.git
           ref: ${TAG}
           fetch-depth: 0
 
