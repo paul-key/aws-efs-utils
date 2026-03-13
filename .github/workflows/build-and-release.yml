@@ -9,11 +9,13 @@ on:
 permissions:
   contents: write
 
+env:
+  TAG: ${{ vars.TAG }}
+
 jobs:
   build-amd64:
     env:
       ARCH: amd64
-      TAG: v2.4.2
       PKG: ${{ matrix.pkg }}
     name: Build ${{ matrix.pkg }} for amd64
     strategy:
@@ -155,7 +157,6 @@ jobs:
   build-arm64:
     env:
       ARCH: arm64
-      TAG: v2.4.2
       PKG: ${{ matrix.pkg }}
     name: Build ${{ matrix.pkg }} for arm64
     strategy:
@@ -186,7 +187,6 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ env.TAG }}
-          name: ${{ github.ref_name }}
           draft: false
           prerelease: false
           files: |
