@@ -127,7 +127,7 @@ jobs:
           if [ "$PKG" = "deb" ]; then
             cp build/amazon-efs-utils*deb dist/
           else
-            cp build/rpmbuild/RPMS/*/*rpm build
+            cp build/rpmbuild/RPMS/*/*rpm dist/
           fi
 
       - name: Upload build artifact
