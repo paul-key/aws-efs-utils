@@ -6,10 +6,6 @@ on:
       - "v*"
   workflow_dispatch:
 
-env:
-  TAG: v2.4.2
-  PKG: ${{ matrix.pkg }}
-
 permissions:
   contents: write
 
@@ -152,6 +148,8 @@ jobs:
         pkg: [ deb, rpm ]
     env:
       ARCH: amd64
+      TAG: v2.4.2
+      PKG: ${{ matrix.pkg }}
     runs-on: ubuntu-24.04
     steps:
       - *build-steps
@@ -164,6 +162,8 @@ jobs:
         pkg: [ deb, rpm ]
     env:
       ARCH: arm64
+      TAG: v2.4.2
+      PKG: ${{ matrix.pkg }}
     runs-on: ubuntu-24.04-arm
     steps:
       - *build-steps
