@@ -1,0 +1,191 @@
+name: Build and Release aws-efs-utils
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build ${{ matrix.pkg }} for ${{ matrix.arch }}
+    runs-on: ubuntu-24.04-arm
+#    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        pkg: [deb]
+        arch: [arm64]
+#      matrix:
+#        pkg: [deb, rpm]
+#        arch: [amd64, arm64]
+
+    env:
+      PKG: ${{ matrix.pkg }}
+      ARCH: ${{ matrix.arch }}
+      TAG: v2.4.2
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          repo: git@github.com:aws/efs-utils.git
+          ref: ${TAG}
+          fetch-depth: 0
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build package in container
+        run: |
+          set -e
+
+          VERSION="${TAG#v}"
+
+          echo "Building $PKG for $ARCH, version $VERSION"
+
+          case "$ARCH" in
+            amd64)
+              DEB_ARCH=amd64
+              RPM_ARCH=x86_64
+              ;;
+            arm64)
+              DEB_ARCH=arm64
+              RPM_ARCH=aarch64
+              ;;
+            *)
+              echo "Unknown arch $ARCH"
+              exit 1
+              ;;
+          esac
+
+          if [ "$PKG" = "deb" ]; then
+            BASE_IMAGE="ubuntu:22.04"
+          else
+            BASE_IMAGE="amazonlinux:2"
+          fi
+
+          docker run --rm \
+            --platform="linux/$ARCH" \
+            -v "$PWD":/src \
+            -w /src \
+            "$BASE_IMAGE" \
+            /bin/bash -c '
+              set -e
+
+              if [ "$PKG" = "deb" ]; then
+                apt-get update
+                DEBIAN_FRONTEND=noninteractive apt-get -y install \
+                  git \
+                  golang \
+                  binutils \
+                  rustc \
+                  cargo \
+                  libssl-dev \
+                  pkg-config \
+                  gettext \
+                  make \
+                  gcc \
+                  g++ \
+                  cmake \
+                  wget \
+                  perl
+
+                # We already have the repo checked out at /src, so no git clone here.
+                if [ ! -x "./build-deb.sh" ]; then
+                  echo "build-deb.sh not found; adjust path if needed"
+                  ls
+                  exit 1
+                fi
+
+                ./build-deb.sh
+
+              else
+                yum -y install \
+                  git \
+                  golang \
+                  rpm-build \
+                  make \
+                  rust \
+                  cargo \
+                  openssl-devel \
+                  gcc \
+                  gcc-c++ \
+                  cmake \
+                  wget \
+                  perl
+
+                make rpm
+              fi
+            '
+
+          mkdir -p dist
+
+          if [ "$PKG" = "deb" ]; then
+            # build-deb.sh: ./build/amazon-efs-utils*deb
+            DEB_FILE=$(ls build/amazon-efs-utils*deb | head -n 1 || true)
+            if [ -z "$DEB_FILE" ]; then
+              echo "No .deb file found under build/"
+              ls -R
+              exit 1
+            fi
+            OUT="dist/aws-efs-utils_${VERSION}_${DEB_ARCH}.deb"
+            cp "$DEB_FILE" "$OUT"
+            echo "Created $OUT"
+          else
+            # make rpm: build/rpmbuild/RPMS/*/*.rpm
+            RPM_FILE=$(find build/rpmbuild/RPMS -name "amazon-efs-utils*.rpm" | head -n 1 || true)
+            if [ -z "$RPM_FILE" ]; then
+              echo "No amazon-efs-utils RPM found under build/rpmbuild/RPMS"
+              ls -R build || true
+              exit 1
+            fi
+            OUT="dist/aws-efs-utils-${VERSION}-${RPM_ARCH}.rpm"
+            cp "$RPM_FILE" "$OUT"
+            echo "Created $OUT"
+          fi
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: aws-efs-utils-${{ matrix.pkg }}-${{ matrix.arch }}
+          path: dist/*
+
+#  release:
+#    name: Create GitHub Release and upload packages
+#    runs-on: ubuntu-latest
+#    needs: build
+#
+#    steps:
+#      - name: Checkout
+#        uses: actions/checkout@v4
+#        with:
+#          fetch-depth: 0
+#
+#      - name: Download all build artifacts
+#        uses: actions/download-artifact@v4
+#        with:
+#          path: ./dist
+#
+#      - name: List artifacts
+#        run: ls -R ./dist
+#
+#      - name: Create / update GitHub Release
+#        uses: softprops/action-gh-release@v2
+#        with:
+#          tag_name: ${{ github.ref_name }}
+#          name: ${{ github.ref_name }}
+#          draft: false
+#          prerelease: false
+#          files: |
+#            dist/**/*.deb
+#            dist/**/*.rpm
+#        env:
+#          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
