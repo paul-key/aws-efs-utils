@@ -126,28 +126,26 @@ jobs:
   
           if [ "$PKG" = "deb" ]; then
             # build-deb.sh: ./build/amazon-efs-utils*deb
-#            DEB_FILE=$(ls build/amazon-efs-utils*deb | head -n 1 || true)
-#            if [ -z "$DEB_FILE" ]; then
-#              echo "No .deb file found under build/"
-#              ls -R
-#              exit 1
-#            fi
-#            OUT="dist/aws-efs-utils-${DEB_ARCH}.deb"
-#            cp "$DEB_FILE" "$OUT"
-#            echo "Created $OUT"
-            cp build/amazon-efs-utils*deb dist/
+            DEB_FILE=$(ls build/amazon-efs-utils*deb | head -n 1 || true)
+            if [ -z "$DEB_FILE" ]; then
+              echo "No .deb file found under build/"
+              ls -R
+              exit 1
+            fi
+            OUT="dist/aws-efs-utils-${DEB_ARCH}.deb"
+            cp "$DEB_FILE" "$OUT"
+            echo "Created $OUT"
           else
             # make rpm: build/rpmbuild/RPMS/*/*.rpm
-#            RPM_FILE=$(find build/rpmbuild/RPMS -name "amazon-efs-utils*.rpm" | head -n 1 || true)
-#            if [ -z "$RPM_FILE" ]; then
-#              echo "No amazon-efs-utils RPM found under build/rpmbuild/RPMS"
-#              ls -R build || true
-#              exit 1
-#            fi
-#            OUT="dist/aws-efs-utils-${RPM_ARCH}.rpm"
-#            cp "$RPM_FILE" "$OUT"
-#            echo "Created $OUT"
-            cp build/rpmbuild/RPMS/*/*rpm build
+            RPM_FILE=$(find build/rpmbuild/RPMS -name "amazon-efs-utils*.rpm" | head -n 1 || true)
+            if [ -z "$RPM_FILE" ]; then
+              echo "No amazon-efs-utils RPM found under build/rpmbuild/RPMS"
+              ls -R build || true
+              exit 1
+            fi
+            OUT="dist/aws-efs-utils-${RPM_ARCH}.rpm"
+            cp "$RPM_FILE" "$OUT"
+            echo "Created $OUT"
           fi
 
       - name: Upload build artifact
