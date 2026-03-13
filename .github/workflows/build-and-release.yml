@@ -1,170 +1,172 @@
 name: Build and Release aws-efs-utils
 
-env:
-  TAG: v2.4.2
-
 on:
   push:
     tags:
       - "v*"
   workflow_dispatch:
 
+env:
+  TAG: v2.4.2
+  PKG: ${{ matrix.pkg }}
+
 permissions:
   contents: write
 
 jobs:
-  build-template: &BUILD_TEMPLATE
-    name: Build ${{ matrix.pkg }} for ${{ env.ARCH }}
+  .build-steps: &build-steps
+    - name: Checkout
+      uses: actions/checkout@v6
+      with:
+        repository: aws/efs-utils.git
+        ref: ${{ env.TAG }}
+        fetch-depth: 0
 
+    - name: Set up QEMU
+      uses: docker/setup-qemu-action@v3
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Build package in container
+      run: |
+        set -e
+
+        VERSION="${TAG#v}"
+
+        echo "Building $PKG for $ARCH, version $VERSION"
+
+        case "$ARCH" in
+          amd64)
+            DEB_ARCH=amd64
+            RPM_ARCH=x86_64
+            ;;
+          arm64)
+            DEB_ARCH=arm64
+            RPM_ARCH=aarch64
+            ;;
+          *)
+            echo "Unknown arch $ARCH"
+            exit 1
+            ;;
+        esac
+
+        if [ "$PKG" = "deb" ]; then
+          BASE_IMAGE="ubuntu:22.04"
+        else
+          BASE_IMAGE="amazonlinux:2"
+        fi
+
+        docker run --rm \
+          --platform="linux/$ARCH" \
+          -v "$PWD":/src \
+          -w /src \
+          -e "PKG=${PKG}" \
+          "$BASE_IMAGE" \
+          /bin/bash -c '
+            set -e
+
+            if [ "$PKG" = "deb" ]; then
+              apt-get update
+              DEBIAN_FRONTEND=noninteractive apt-get -y install \
+                git \
+                golang \
+                binutils \
+                rustc \
+                cargo \
+                libssl-dev \
+                pkg-config \
+                gettext \
+                make \
+                gcc \
+                g++ \
+                cmake \
+                wget \
+                perl
+
+              # We already have the repo checked out at /src, so no git clone here.
+              if [ ! -x "./build-deb.sh" ]; then
+                echo "build-deb.sh not found; adjust path if needed"
+                ls
+                exit 1
+              fi
+
+              ./build-deb.sh
+
+            else
+              yum -y install \
+                git \
+                golang \
+                rpm-build \
+                make \
+                rust \
+                cargo \
+                openssl-devel \
+                gcc \
+                gcc-c++ \
+                cmake \
+                wget \
+                perl
+
+              make rpm
+            fi
+          '
+
+        mkdir -p dist
+
+        if [ "$PKG" = "deb" ]; then
+          # build-deb.sh: ./build/amazon-efs-utils*deb
+          DEB_FILE=$(ls build/amazon-efs-utils*deb | head -n 1 || true)
+          if [ -z "$DEB_FILE" ]; then
+            echo "No .deb file found under build/"
+            ls -R
+            exit 1
+          fi
+          OUT="dist/aws-efs-utils_${VERSION}_${DEB_ARCH}.deb"
+          cp "$DEB_FILE" "$OUT"
+          echo "Created $OUT"
+        else
+          # make rpm: build/rpmbuild/RPMS/*/*.rpm
+          RPM_FILE=$(find build/rpmbuild/RPMS -name "amazon-efs-utils*.rpm" | head -n 1 || true)
+          if [ -z "$RPM_FILE" ]; then
+            echo "No amazon-efs-utils RPM found under build/rpmbuild/RPMS"
+            ls -R build || true
+            exit 1
+          fi
+          OUT="dist/aws-efs-utils-${VERSION}-${RPM_ARCH}.rpm"
+          cp "$RPM_FILE" "$OUT"
+          echo "Created $OUT"
+        fi
+
+    - name: Upload build artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: aws-efs-utils-${{ matrix.pkg }}-${{ matrix.arch }}
+        path: dist/*
+
+  build-amd64:
+    name: Build ${{ matrix.pkg }} for ${{ env.ARCH }}
     strategy:
       fail-fast: false
       matrix:
         pkg: [ deb, rpm ]
-
-    env:
-      PKG: ${{ matrix.pkg }}
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-        with:
-          repository: aws/efs-utils.git
-          ref: ${{ env.TAG }}
-          fetch-depth: 0
-
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Build package in container
-        run: |
-          set -e
-
-          VERSION="${TAG#v}"
-
-          echo "Building $PKG for $ARCH, version $VERSION"
-
-          case "$ARCH" in
-            amd64)
-              DEB_ARCH=amd64
-              RPM_ARCH=x86_64
-              ;;
-            arm64)
-              DEB_ARCH=arm64
-              RPM_ARCH=aarch64
-              ;;
-            *)
-              echo "Unknown arch $ARCH"
-              exit 1
-              ;;
-          esac
-
-          if [ "$PKG" = "deb" ]; then
-            BASE_IMAGE="ubuntu:22.04"
-          else
-            BASE_IMAGE="amazonlinux:2"
-          fi
-
-          docker run --rm \
-            --platform="linux/$ARCH" \
-            -v "$PWD":/src \
-            -w /src \
-            -e "PKG=${PKG}" \
-            "$BASE_IMAGE" \
-            /bin/bash -c '
-              set -e
-
-              if [ "$PKG" = "deb" ]; then
-                apt-get update
-                DEBIAN_FRONTEND=noninteractive apt-get -y install \
-                  git \
-                  golang \
-                  binutils \
-                  rustc \
-                  cargo \
-                  libssl-dev \
-                  pkg-config \
-                  gettext \
-                  make \
-                  gcc \
-                  g++ \
-                  cmake \
-                  wget \
-                  perl
-
-                # We already have the repo checked out at /src, so no git clone here.
-                if [ ! -x "./build-deb.sh" ]; then
-                  echo "build-deb.sh not found; adjust path if needed"
-                  ls
-                  exit 1
-                fi
-
-                ./build-deb.sh
-
-              else
-                yum -y install \
-                  git \
-                  golang \
-                  rpm-build \
-                  make \
-                  rust \
-                  cargo \
-                  openssl-devel \
-                  gcc \
-                  gcc-c++ \
-                  cmake \
-                  wget \
-                  perl
-
-                make rpm
-              fi
-            '
-
-          mkdir -p dist
-
-          if [ "$PKG" = "deb" ]; then
-            # build-deb.sh: ./build/amazon-efs-utils*deb
-            DEB_FILE=$(ls build/amazon-efs-utils*deb | head -n 1 || true)
-            if [ -z "$DEB_FILE" ]; then
-              echo "No .deb file found under build/"
-              ls -R
-              exit 1
-            fi
-            OUT="dist/aws-efs-utils_${VERSION}_${DEB_ARCH}.deb"
-            cp "$DEB_FILE" "$OUT"
-            echo "Created $OUT"
-          else
-            # make rpm: build/rpmbuild/RPMS/*/*.rpm
-            RPM_FILE=$(find build/rpmbuild/RPMS -name "amazon-efs-utils*.rpm" | head -n 1 || true)
-            if [ -z "$RPM_FILE" ]; then
-              echo "No amazon-efs-utils RPM found under build/rpmbuild/RPMS"
-              ls -R build || true
-              exit 1
-            fi
-            OUT="dist/aws-efs-utils-${VERSION}-${RPM_ARCH}.rpm"
-            cp "$RPM_FILE" "$OUT"
-            echo "Created $OUT"
-          fi
-
-      - name: Upload build artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: aws-efs-utils-${{ matrix.pkg }}-${{ matrix.arch }}
-          path: dist/*
-
-  build-amd64:
-    <<: *BUILD_TEMPLATE
     env:
       ARCH: amd64
     runs-on: ubuntu-24.04
+    steps:
+      - *build-steps
 
   build-arm64:
-    <<: *BUILD_TEMPLATE
+    name: Build ${{ matrix.pkg }} for ${{ env.ARCH }}
+    strategy:
+      fail-fast: false
+      matrix:
+        pkg: [ deb, rpm ]
     env:
       ARCH: arm64
     runs-on: ubuntu-24.04-arm
+    steps:
+      - *build-steps
 
   release:
     name: Create GitHub Release and upload packages
