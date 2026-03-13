@@ -16,9 +16,10 @@ jobs:
       TAG: v2.4.2
       PKG: ${{ matrix.pkg }}
     name: Build ${{ matrix.pkg }} for amd64
-    strategy: &strategy
+    strategy:
       fail-fast: false
       matrix:
+        arch: amd64
         pkg: [ deb, rpm ]
     runs-on: ubuntu-24.04
     steps: &build-steps
@@ -111,7 +112,7 @@ jobs:
                   openssl-devel \
                   gcc \
                   gcc-c++ \
-                  cmake \
+                  cmake3 \
                   wget \
                   perl
   
@@ -157,7 +158,11 @@ jobs:
       TAG: v2.4.2
       PKG: ${{ matrix.pkg }}
     name: Build ${{ matrix.pkg }} for arm64
-    strategy: *strategy
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: arm64
+        pkg: [ deb, rpm ]
     runs-on: ubuntu-24.04-arm
     steps: *build-steps
 
