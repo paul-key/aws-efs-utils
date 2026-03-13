@@ -132,7 +132,7 @@ jobs:
               ls -R
               exit 1
             fi
-            OUT="dist/aws-efs-utils_${VERSION}_${DEB_ARCH}.deb"
+            OUT="dist/aws-efs-utils-${DEB_ARCH}.deb"
             cp "$DEB_FILE" "$OUT"
             echo "Created $OUT"
           else
@@ -143,7 +143,7 @@ jobs:
               ls -R build || true
               exit 1
             fi
-            OUT="dist/aws-efs-utils-${VERSION}-${RPM_ARCH}.rpm"
+            OUT="dist/aws-efs-utils-${RPM_ARCH}.rpm"
             cp "$RPM_FILE" "$OUT"
             echo "Created $OUT"
           fi
