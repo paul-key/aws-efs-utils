@@ -48,12 +48,10 @@ jobs:
   
           case "$ARCH" in
             amd64)
-              DEB_ARCH=amd64
-              RPM_ARCH=x86_64
+              PAK_ARCH=amd64
               ;;
             arm64)
-              DEB_ARCH=arm64
-              RPM_ARCH=aarch64
+              PAK_ARCH=arm64
               ;;
             *)
               echo "Unknown arch $ARCH"
@@ -62,7 +60,7 @@ jobs:
           esac
   
           if [ "$PKG" = "deb" ]; then
-            BASE_IMAGE="ubuntu:22.04"
+            BASE_IMAGE="ubuntu:24.04"
           else
             BASE_IMAGE="amazonlinux:2"
           fi
@@ -131,7 +129,7 @@ jobs:
               ls -R
               exit 1
             fi
-            OUT="dist/aws-efs-utils-${DEB_ARCH}.deb"
+            OUT="dist/aws-efs-utils-${PAK_ARCH}.deb"
             cp "$DEB_FILE" "$OUT"
             echo "Created $OUT"
           else
@@ -141,7 +139,7 @@ jobs:
               ls -R build || true
               exit 1
             fi
-            OUT="dist/aws-efs-utils-${RPM_ARCH}.rpm"
+            OUT="dist/aws-efs-utils-${PAK_ARCH}.rpm"
             cp "$RPM_FILE" "$OUT"
             echo "Created $OUT"
           fi
